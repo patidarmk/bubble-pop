@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import { MadeWithApplaa } from "@/components/made-with-applaa";
 
 interface Bubble {
@@ -13,181 +13,206 @@ interface Bubble {
   opacity: number;
 }
 
-const colors = [
-  "bg-pink-400",
-  "bg-blue-400",
-  "bg-purple-400",
-  "bg-green-400",
-  "bg-yellow-400",
-  "bg-red-400",
-  "bg-indigo-400",
-  "bg-cyan-400",
+const BUBBLE_COLORS = [
+  'bg-blue-400',
+  'bg-purple-400',
+  'bg-pink-400',
+  'bg-green-400',
+  'bg-yellow-400',
+  'bg-red-400',
+  'bg-indigo-400',
+  'bg-cyan-400',
 ];
 
 export default function BubblePopGame() {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [score, setScore] = useState(0);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [nextId, setNextId] = useState(1);
+  const [gameActive, setGameActive] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [highScore, setHighScore] = useState(0);
 
+  // Generate random bubble
   const createBubble = useCallback(() => {
     const newBubble: Bubble = {
-      id: nextId,
+      id: Date.now() + Math.random(),
       x: Math.random() * (window.innerWidth - 100),
       y: window.innerHeight + 50,
       size: Math.random() * 40 + 30,
-      color: colors[Math.floor(Math.random() * colors.length)],
+      color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
       speed: Math.random() * 2 + 1,
       opacity: 1,
     };
-    setNextId(prev => prev + 1);
     return newBubble;
-  }, [nextId]);
+  }, []);
 
+  // Start game
+  const startGame = () => {
+    setGameActive(true);
+    setScore(0);
+    setTimeLeft(60);
+    setBubbles([]);
+  };
+
+  // End game
+  const endGame = () => {
+    setGameActive(false);
+    setBubbles([]);
+    if (score > highScore) {
+      setHighScore(score);
+    }
+  };
+
+  // Pop bubble
   const popBubble = (id: number) => {
     setBubbles(prev => prev.filter(bubble => bubble.id !== id));
     setScore(prev => prev + 10);
   };
 
-  const startGame = () => {
-    setGameStarted(true);
-    setScore(0);
-    setBubbles([]);
-    setNextId(1);
-  };
-
-  const resetGame = () => {
-    setGameStarted(false);
-    setScore(0);
-    setBubbles([]);
-    setNextId(1);
-  };
-
+  // Game timer
   useEffect(() => {
-    if (!gameStarted) return;
+    let timer: NodeJS.Timeout;
+    if (gameActive && timeLeft > 0) {
+      timer = setTimeout(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && gameActive) {
+      endGame();
+    }
+    return () => clearTimeout(timer);
+  }, [gameActive, timeLeft]);
 
-    const gameInterval = setInterval(() => {
-      setBubbles(prev => {
-        const newBubbles = [...prev];
-        
-        // Add new bubble occasionally
-        if (Math.random() < 0.3 && newBubbles.length < 8) {
-          newBubbles.push(createBubble());
-        }
+  // Bubble generation
+  useEffect(() => {
+    let bubbleGenerator: NodeJS.Timeout;
+    if (gameActive) {
+      bubbleGenerator = setInterval(() => {
+        setBubbles(prev => [...prev, createBubble()]);
+      }, 800);
+    }
+    return () => clearInterval(bubbleGenerator);
+  }, [gameActive, createBubble]);
 
-        // Move bubbles up and fade them out
-        return newBubbles
-          .map(bubble => ({
-            ...bubble,
-            y: bubble.y - bubble.speed,
-            opacity: bubble.y < 100 ? bubble.opacity - 0.02 : bubble.opacity,
-          }))
-          .filter(bubble => bubble.y > -100 && bubble.opacity > 0);
-      });
-    }, 50);
-
-    return () => clearInterval(gameInterval);
-  }, [gameStarted, createBubble]);
+  // Bubble movement and cleanup
+  useEffect(() => {
+    let animationFrame: number;
+    if (gameActive) {
+      const animate = () => {
+        setBubbles(prev => 
+          prev
+            .map(bubble => ({
+              ...bubble,
+              y: bubble.y - bubble.speed,
+              opacity: bubble.y < 100 ? bubble.opacity - 0.02 : bubble.opacity,
+            }))
+            .filter(bubble => bubble.y > -100 && bubble.opacity > 0)
+        );
+        animationFrame = requestAnimationFrame(animate);
+      };
+      animationFrame = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(animationFrame);
+  }, [gameActive]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-200 to-blue-400 overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 relative overflow-hidden">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 bg-white/90 backdrop-blur-sm shadow-lg">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Bubble Pop!
-          </h1>
-          <div className="flex items-center space-x-4">
-            <div className="text-2xl font-bold text-gray-700">
-              Score: {score}
+      <div className="absolute top-0 left-0 right-0 z-20 p-6">
+        <div className="flex justify-between items-center">
+          <div className="text-white">
+            <h1 className="text-3xl font-bold mb-2">Bubble Pop</h1>
+            <div className="flex gap-6">
+              <div className="text-lg">
+                <span className="font-semibold">Score: </span>
+                <span className="text-yellow-300">{score}</span>
+              </div>
+              <div className="text-lg">
+                <span className="font-semibold">Time: </span>
+                <span className="text-red-300">{timeLeft}s</span>
+              </div>
+              <div className="text-lg">
+                <span className="font-semibold">High Score: </span>
+                <span className="text-green-300">{highScore}</span>
+              </div>
             </div>
-            {gameStarted ? (
-              <button
-                onClick={resetGame}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
-              >
-                Reset
-              </button>
-            ) : (
-              <button
-                onClick={startGame}
-                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
-              >
-                Start Game
-              </button>
-            )}
           </div>
+          <button
+            onClick={startGame}
+            disabled={gameActive}
+            className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg shadow-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
+          >
+            {gameActive ? 'Playing...' : 'Start Game'}
+          </button>
         </div>
       </div>
 
       {/* Game Area */}
-      <div className="pt-20 h-screen relative">
-        {!gameStarted ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white mb-4">
-                Welcome to Bubble Pop!
-              </h2>
-              <p className="text-xl text-white/90 mb-8">
-                Tap the floating bubbles to pop them and earn points!
-              </p>
-              <div className="space-y-4 text-white/80">
-                <p>🫧 Different colored bubbles give different points</p>
-                <p>⚡ Bubbles float up at different speeds</p>
-                <p>🏆 Try to get the highest score!</p>
-              </div>
-            </div>
-            <button
-              onClick={startGame}
-              className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-xl font-bold rounded-full shadow-lg transform hover:scale-105 transition-all duration-200"
-            >
-              Start Playing!
-            </button>
+      <div className="absolute inset-0 pt-32">
+        {/* Bubbles */}
+        {bubbles.map(bubble => (
+          <div
+            key={bubble.id}
+            className={`absolute rounded-full cursor-pointer transform transition-all duration-200 hover:scale-110 ${bubble.color} shadow-lg`}
+            style={{
+              left: `${bubble.x}px`,
+              top: `${bubble.y}px`,
+              width: `${bubble.size}px`,
+              height: `${bubble.size}px`,
+              opacity: bubble.opacity,
+              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), transparent 50%)`,
+            }}
+            onClick={() => popBubble(bubble.id)}
+          >
+            <div 
+              className="w-full h-full rounded-full"
+              style={{
+                background: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.6), transparent 40%)`,
+              }}
+            />
           </div>
-        ) : (
-          <>
-            {/* Bubbles */}
-            {bubbles.map(bubble => (
-              <button
-                key={bubble.id}
-                onClick={() => popBubble(bubble.id)}
-                className={`absolute rounded-full ${bubble.color} shadow-lg transform hover:scale-110 transition-transform duration-150 cursor-pointer animate-pulse`}
-                style={{
-                  left: `${bubble.x}px`,
-                  top: `${bubble.y}px`,
-                  width: `${bubble.size}px`,
-                  height: `${bubble.size}px`,
-                  opacity: bubble.opacity,
-                  boxShadow: `0 0 20px rgba(255, 255, 255, 0.5), inset -5px -5px 10px rgba(255, 255, 255, 0.3), inset 5px 5px 10px rgba(0, 0, 0, 0.1)`,
-                }}
-              >
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-white/40 to-transparent" />
-              </button>
-            ))}
+        ))}
 
-            {/* Floating particles effect */}
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-2 h-2 bg-white/20 rounded-full animate-bounce"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 2}s`,
-                    animationDuration: `${2 + Math.random() * 3}s`,
-                  }}
-                />
-              ))}
+        {/* Game Over Screen */}
+        {!gameActive && timeLeft === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30">
+            <div className="bg-white rounded-xl p-8 text-center shadow-2xl">
+              <h2 className="text-3xl font-bold mb-4 text-gray-800">Game Over!</h2>
+              <p className="text-xl mb-2 text-gray-600">Final Score: <span className="font-bold text-blue-600">{score}</span></p>
+              {score === highScore && score > 0 && (
+                <p className="text-lg mb-4 text-green-600 font-semibold">🎉 New High Score! 🎉</p>
+              )}
+              <button
+                onClick={startGame}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-lg shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
+              >
+                Play Again
+              </button>
             </div>
-          </>
+          </div>
+        )}
+
+        {/* Welcome Screen */}
+        {!gameActive && timeLeft === 60 && (
+          <div className="absolute inset-0 flex items-center justify-center z-30">
+            <div className="text-center text-white">
+              <h2 className="text-5xl font-bold mb-6">Tap the Bubbles!</h2>
+              <p className="text-xl mb-8 opacity-90">Pop as many bubbles as you can in 60 seconds</p>
+              <button
+                onClick={startGame}
+                className="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xl rounded-lg shadow-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
+              >
+                Start Playing
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <MadeWithApplaa />
+      {/* Instructions */}
+      <div className="absolute bottom-6 left-6 right-6 text-center text-white opacity-75">
+        <p className="text-sm">Tap or click the floating bubbles to pop them and earn points!</p>
       </div>
+
+      <MadeWithApplaa />
     </div>
   );
 }
